@@ -8,7 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { User, Activity, MapPin, Mail, Sparkles, Send, Stethoscope, FileText, Smartphone, MessageSquare, Trash2, Save } from "lucide-react";
+import { 
+  User, Activity, MapPin, Mail, Sparkles, Send, Stethoscope, FileText, 
+  Smartphone, MessageSquare, Trash2, Save, ExternalLink
+} from "lucide-react";
+import Link from "next/link"; // Next.js Link for standard page navigation
 
 export default function Member360() {
   const { id } = useParams();
@@ -20,27 +24,21 @@ export default function Member360() {
   const [generating, setGenerating] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
 
-  // Extract plain text from HTML
   const extractTextFromHtml = (html: string) => {
     const div = document.createElement("div");
     div.innerHTML = html;
     return div.innerText || "";
   };
 
-  // Convert plain text back to HTML template
   const convertTextToHtml = (text: string) => {
-    // If it's already HTML, return as is
     if (text.includes("<html>") || text.includes("<div")) {
       return text;
     }
-    // Otherwise return plain text (will be stored as is)
     return text;
   };
 
-  // Real-time update of email content as user edits
   const handleEditableTextChange = (newText: string) => {
     setEditableText(newText);
-    // Update the email content in real-time for preview
     setEmailContent(newText);
   };
   
@@ -67,6 +65,9 @@ export default function Member360() {
   if (loading) return <div className="p-8 text-center text-orange-500">Loading patient data...</div>;
   if (!member) return <div className="p-8 text-center text-red-500">Patient not found.</div>;
 
+  // Conditional flag: only true if there is BCS data
+  const hasBcsData = member.line_of_business !== null && member.line_of_business !== undefined;
+
   const handleGenerate = async () => {
     setGenerating(true);
     try {
@@ -84,7 +85,6 @@ export default function Member360() {
 
   const handleSaveDraft = async () => {
     try {
-      // Save the HTML content, not the editable text
       await saveEmailDraft(member.id_normalized, emailContent, member.primary_language);
       toast("Draft updated successfully");
       loadLogs(member.profile_member_id);
@@ -118,9 +118,23 @@ export default function Member360() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Patient 360: {member.member_name}</h1>
-        <Badge variant={member.priority === 'CRITICAL' ? 'destructive' : member.priority === 'HIGH' ? 'default' : 'secondary'} className="text-sm px-3 py-1">
-          {member.priority} PRIORITY
-        </Badge>
+        
+        <div className="flex items-center gap-3">
+          
+          {/* CONDITIONALLY RENDERED LINK TO NEW PAGE (SAME TAB) */}
+          {hasBcsData && (
+            <Link href={`/members/${id}/details`}>
+              <Button variant="outline" className="flex items-center gap-2 border-slate-300 hover:bg-slate-50 transition-colors">
+                More Details <ExternalLink className="w-4 h-4 text-slate-500" />
+              </Button>
+            </Link>
+          )}
+          {/* END LINK */}
+
+          <Badge variant={member.priority === 'CRITICAL' ? 'destructive' : member.priority === 'HIGH' ? 'default' : 'secondary'} className="text-sm px-3 py-1">
+            {member.priority} PRIORITY
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -278,8 +292,6 @@ export default function Member360() {
           )}
         </CardContent>
       </Card>
-
-      {/* Communication Log Section */}
     </div>
   );
 }

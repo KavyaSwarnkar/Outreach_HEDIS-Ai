@@ -97,6 +97,7 @@ function MembersList() {
               <SelectItem value="OMW">OMW</SelectItem>
               <SelectItem value="SPC">SPC</SelectItem>
               <SelectItem value="COL">COL</SelectItem>
+              <SelectItem value="BCS">BCS</SelectItem>
             </SelectContent>
           </Select>
           
@@ -187,12 +188,13 @@ function MembersList() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Link href={`/members/${m.id_normalized}`}>
-                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800 hover:bg-slate-100 font-medium">
-                      <Eye className="w-4 h-4 mr-2" /> View 360
-                    </Button>
-                  </Link>
-                </TableCell>
+  {/* BCS goes to details, everything else goes to the standard [id] page */}
+  <Link href={m.measure === 'BCS' ? `/members/${m.id_normalized}/details` : `/members/${m.id_normalized}`}>
+    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800 hover:bg-slate-100 font-medium">
+      <Eye className="w-4 h-4 mr-2" /> View 360
+    </Button>
+  </Link>
+</TableCell>
               </TableRow>
             ))}
           </TableBody>

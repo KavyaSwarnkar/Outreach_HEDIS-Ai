@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from database import get_db
 from models.schemas import MemberBase, Member360
 from typing import List, Optional
+import pandas as pd
 
 router = APIRouter()
 
@@ -47,9 +48,9 @@ def get_members(
         query += " AND transportation_access = ?"
         params.append(transportation)
         
-    # Count total
+    # Count total (cast to native Python int to avoid numpy int64 serialization errors)
     count_query = f"SELECT COUNT(*) FROM ({query})"
-    total = conn.execute(count_query, params).fetchone()[0]
+    total = int(conn.execute(count_query, params).fetchone()[0])
     
     # Pagination
     offset = (page - 1) * limit
@@ -58,8 +59,8 @@ def get_members(
     
     df = conn.execute(query, params).df()
     
-    # Convert dates to string to avoid JSON serialization issues with NaT/NaN
-    df = df.where(df.notnull(), None) 
+    # SAFELY CONVERT ALL PANDAS NaNs/NaTs to native Python None values
+    df = df.astype(object).where(pd.notnull(df), None)
     
     members = df.to_dict(orient="records")
     
@@ -74,10 +75,13 @@ def get_members(
 def get_member(member_id: int):
     conn = get_db()
     result = conn.execute("SELECT * FROM patient_360 WHERE id_normalized = ?", [member_id]).df()
+    
     if result.empty:
         raise HTTPException(status_code=404, detail="Member not found")
         
-    result = result.where(result.notnull(), None)
+    # SAFELY CONVERT ALL PANDAS NaNs/NaTs to native Python None values
+    result = result.astype(object).where(pd.notnull(result), None)
+    
     member_data = result.to_dict(orient="records")[0]
     
     return member_data
