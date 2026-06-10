@@ -41,6 +41,13 @@ export default function Member360() {
     setEditableText(newText);
     setEmailContent(newText);
   };
+
+  const getPriorityBadgeClass = (priority?: string) => {
+    if (priority === "CRITICAL") return "bg-red-600 text-white border-red-700 shadow-sm ring-2 ring-red-100 font-extrabold tracking-wide";
+    if (priority === "HIGH") return "bg-orange-100 text-orange-700 border-orange-200 font-semibold";
+    if (priority === "MEDIUM") return "bg-amber-50 text-amber-700 border-amber-200 font-semibold";
+    return "bg-slate-100 text-slate-600 border-slate-200 font-semibold";
+  };
   
   const loadLogs = (profileId: string) => {
     fetchOutreachLog().then((allLogs) => {
@@ -131,7 +138,7 @@ export default function Member360() {
           )}
           {/* END LINK */}
 
-          <Badge variant={member.priority === 'CRITICAL' ? 'destructive' : member.priority === 'HIGH' ? 'default' : 'secondary'} className="text-sm px-3 py-1">
+          <Badge variant="outline" className={`text-sm px-3 py-1 ${getPriorityBadgeClass(member.priority)}`}>
             {member.priority} PRIORITY
           </Badge>
         </div>

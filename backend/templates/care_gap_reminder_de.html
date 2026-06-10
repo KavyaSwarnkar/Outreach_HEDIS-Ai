@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wichtiges Update zu Ihrer Gesundheitsvorsorge</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+        .wrapper { width: 100%; table-layout: fixed; background-color: #f8fafc; padding-bottom: 40px; padding-top: 40px; }
+        .main-card { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .header { background-color: #ea580c; padding: 32px; text-align: center; color: #ffffff; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
+        .content { padding: 32px; line-height: 1.6; }
+        .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-bottom: 16px; }
+        .info-box { background-color: #fff7ed; border: 1px solid #ffedd5; border-radius: 12px; padding: 20px; margin: 24px 0; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .info-row:last-child { margin-bottom: 0; }
+        .info-label { color: #ea580c; font-weight: 600; text-transform: uppercase; font-size: 12px; tracking: 0.05em; }
+        .info-value { color: #431407; font-weight: 500; text-align: right; }
+        .footer { text-align: center; padding: 24px; font-size: 12px; color: #64748b; border-top: 1px solid #f1f5f9; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="main-card">
+            <div class="header">
+                <h1>HEDIS.Ai Gesundheitsassistent</h1>
+            </div>
+            <div class="content">
+                <div class="greeting">Hallo {{ member_name }},</div>
+                <p>wir hoffen, es geht Ihnen gut!</p>
+                <p>Dies ist eine freundliche Erinnerung an Ihre laufende Gesundheitsvorsorge im Bereich: <strong>{{ measure_description }}</strong>. Als Teil Ihres personalisierten Vorsorgeplans möchten wir Sie auf dem Laufenden halten und Sie dabei unterstützen, Ihre Gesundheit proaktiv zu managen.</p>
+                <p>Wir empfehlen Ihnen, Ihre nächstgelegene Gesundheitseinrichtung innerhalb der nächsten {{ remaining_days }} Tage aufzusuchen.</p>
+                
+                <div class="info-box">
+                    <div class="info-row">
+                        <span class="info-label">Vorsorge-Schwerpunkt</span>
+                        <span class="info-value">{{ measure_description }} ({{ measure_code }})</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Fälligkeitsdatum</span>
+                        <span class="info-value" style="color: #dc2626; font-weight: bold;">{{ due_date }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Nächstgelegenes Krankenhaus</span>
+                        <span class="info-value" style="color: #dc2626; font-weight: bold;">{{ appointment_location }}</span>
+                    </div>
+                </div>
+
+                <p>Sollten Sie logistische Hürden oder Probleme mit dem Transport zu Ihrer lokalen Klinik haben, lassen Sie es uns bitte wissen! Wir bieten barrierefreie Telemedizin-Alternativen sowie Unterstützungsmöglichkeiten an, um sicherzustellen, dass Sie Ihre Untersuchung sicher wahrnehmen können.</p>
+                <p>Mit freundlichen Grüßen<br>Ihr HEDIS-Vorsorgeteam</p>
+            </div>
+            <div class="footer">
+                &copy; 2026 HEDIS-Vorsorgeteam. Alle Rechte vorbehalten.<br>
+                Dies ist eine automatisierte, sichere Benachrichtigung zur medizinischen Betreuung.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

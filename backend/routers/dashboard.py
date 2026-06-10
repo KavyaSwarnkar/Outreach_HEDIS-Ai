@@ -116,11 +116,99 @@ def get_charts():
         "total_gaps_closed": total_closed
     }
 
+    # Overdue patient insights from Excel-loaded BCS days_overdue data
+    overdue_bucket_rows = conn.execute("""
+        SELECT
+            CASE
+                WHEN screening_days_overdue BETWEEN 1 AND 30 THEN '1-30 days'
+                WHEN screening_days_overdue BETWEEN 31 AND 90 THEN '31-90 days'
+                WHEN screening_days_overdue BETWEEN 91 AND 180 THEN '91-180 days'
+                WHEN screening_days_overdue BETWEEN 181 AND 365 THEN '181-365 days'
+                ELSE '365+ days'
+            END AS bucket,
+            CASE
+                WHEN screening_days_overdue BETWEEN 1 AND 30 THEN 1
+                WHEN screening_days_overdue BETWEEN 31 AND 90 THEN 2
+                WHEN screening_days_overdue BETWEEN 91 AND 180 THEN 3
+                WHEN screening_days_overdue BETWEEN 181 AND 365 THEN 4
+                ELSE 5
+            END AS sort_order,
+            COUNT(*) AS patient_count,
+            ROUND(AVG(screening_days_overdue), 1) AS average_days_overdue
+        FROM patient_360
+        WHERE screening_days_overdue IS NOT NULL
+          AND screening_days_overdue > 0
+          AND compliant = 'NO'
+        GROUP BY bucket, sort_order
+        ORDER BY sort_order
+    """).fetchall()
+
+    overdue_buckets = [
+        {
+            "bucket": row[0],
+            "patient_count": int(row[2]),
+            "average_days_overdue": float(row[3]) if row[3] is not None else 0
+        }
+        for row in overdue_bucket_rows
+    ]
+
+    overdue_summary_row = conn.execute("""
+        SELECT
+            COUNT(*) AS total_overdue,
+            ROUND(AVG(screening_days_overdue), 1) AS average_days_overdue,
+            MAX(screening_days_overdue) AS max_days_overdue
+        FROM patient_360
+        WHERE screening_days_overdue IS NOT NULL
+          AND screening_days_overdue > 0
+          AND compliant = 'NO'
+    """).fetchone()
+
+    overdue_summary = {
+        "total_overdue": int(overdue_summary_row[0] or 0),
+        "average_days_overdue": float(overdue_summary_row[1] or 0),
+        "max_days_overdue": int(overdue_summary_row[2] or 0)
+    }
+
+    top_overdue_rows = conn.execute("""
+        SELECT
+            id_normalized,
+            profile_member_id,
+            member_name,
+            measure,
+            screening_days_overdue,
+            CAST(gap_due_date AS VARCHAR) AS gap_due_date,
+            screening_risk_score,
+            pcp_assigned
+        FROM patient_360
+        WHERE screening_days_overdue IS NOT NULL
+          AND screening_days_overdue > 0
+          AND compliant = 'NO'
+        ORDER BY screening_days_overdue DESC, screening_risk_score DESC NULLS LAST
+        LIMIT 8
+    """).fetchall()
+
+    top_overdue_patients = [
+        {
+            "id_normalized": row[0],
+            "profile_member_id": row[1],
+            "member_name": row[2],
+            "measure": row[3],
+            "days_overdue": int(row[4] or 0),
+            "gap_due_date": row[5],
+            "risk_score": float(row[6]) if row[6] is not None else None,
+            "pcp_assigned": row[7]
+        }
+        for row in top_overdue_rows
+    ]
+
     return {
         "members_by_measure": members_by_measure,
         "compliance_rate": compliance_rate,
         "language_distribution": language_distribution,
         "sdoh_factors": sdoh_factors,
         "outreach_effectiveness": outreach_effectiveness,
-        "outreach_summary": outreach_summary # New object for the summary metrics
+        "outreach_summary": outreach_summary, # New object for the summary metrics
+        "overdue_buckets": overdue_buckets,
+        "overdue_summary": overdue_summary,
+        "top_overdue_patients": top_overdue_patients
     }

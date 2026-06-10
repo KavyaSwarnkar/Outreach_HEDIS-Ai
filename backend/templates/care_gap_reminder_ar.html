@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحديث مهم بخصوص رعايتك الصحية</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+        .wrapper { width: 100%; table-layout: fixed; background-color: #f8fafc; padding-bottom: 40px; padding-top: 40px; }
+        .main-card { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .header { background-color: #ea580c; padding: 32px; text-align: center; color: #ffffff; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
+        .content { padding: 32px; line-height: 1.6; text-align: right; }
+        .greeting { font-size: 18px; font-weight: 600; color: #0f172a; margin-bottom: 16px; }
+        .info-box { background-color: #fff7ed; border: 1px solid #ffedd5; border-radius: 12px; padding: 20px; margin: 24px 0; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .info-row:last-child { margin-bottom: 0; }
+        .info-label { color: #ea580c; font-weight: 600; text-transform: uppercase; font-size: 12px; }
+        .info-value { color: #431407; font-weight: 500; text-align: left; }
+        .footer { text-align: center; padding: 24px; font-size: 12px; color: #64748b; border-top: 1px solid #f1f5f9; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="main-card">
+            <div class="header">
+                <h1>المساعد الصحي HEDIS.Ai</h1>
+            </div>
+            <div class="content">
+                <div class="greeting">مرحباً {{ member_name }}،</div>
+                <p>نأمل أن تكونوا بخير!</p>
+                <p>هذا تذكير ودي بخصوص رعايتك الصحية المستمرة لـ: <strong>{{ measure_description }}</strong>. كجزء من خطة الرعاية المخصصة لك، نرغب في إبقائك على اطلاع ودعمك في إدارة صحتك بشكل استباقي.</p>
+                <p>نوصيك بزيارة أقرب مرفق رعاية صحية لك خلال الـ {{ remaining_days }} يوماً القادمة.</p>
+                
+                <div class="info-box">
+                    <div class="info-row">
+                        <span class="info-label">التركيز الصحي</span>
+                        <span class="info-value">{{ measure_description }} ({{ measure_code }})</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">تاريخ الاستحقاق</span>
+                        <span class="info-value" style="color: #dc2626; font-weight: bold;">{{ due_date }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">أقرب مستشفى</span>
+                        <span class="info-value" style="color: #dc2626; font-weight: bold;">{{ appointment_location }}</span>
+                    </div>
+                </div>
+
+                <p>إذا واجهت أي عقبات لوجستية أو مشاكل في النقل للوصول إلى عيادتك المحلية، يرجى إعلامنا! نحن نقدم بدائل للرعاية الصحية عن بعد وخيارات مساعدة لضمان حصولك على الرعاية التي تحتاجها بأمان.</p>
+                <p>مع أطيب التحيات،<br>فريق رعاية HEDIS</p>
+            </div>
+            <div class="footer">
+                &copy; 2026 فريق رعاية HEDIS. جميع الحقوق محفوظة.<br>
+                هذا إشعار آلي وآمن لمراقبة الرعاية الطبية.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

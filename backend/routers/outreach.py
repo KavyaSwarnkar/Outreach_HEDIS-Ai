@@ -99,22 +99,38 @@ def generate_email(req: EmailGenerateRequest):
         
     # Calculate the target due date
     calculated_due_date = (datetime.now() + timedelta(days=days_to_add)).strftime("%B %d, %Y")
-
+    if measure_code == "BCS":
+        appointment_date = member_data.get("upcoming_pcp_visit_date")
+    else:
+        appointment_date = calculated_due_date
     context_data = {
         "member_name": member_data.get("member_name", "Valued Member"),
         "measure_description": member_data.get("measure_description", "Preventive Health Visit"),
         "measure_code": member_data.get("measure", "HEDIS-GAP"),
         "gap_closure_action": member_data.get("gap_closure", "Consult with your Primary Care Provider."),
         "remaining_days": remaining_days,
-        "due_date": calculated_due_date,
+        "due_date": appointment_date,
         "care_gaps": member_data.get("care_gaps", "1"),
         "upcoming_appointment": member_data.get("appointment_date") is not None,
+        
         "appointment_datetime": f"{member_data.get('appointment_date', '')} at {member_data.get('appointment_time', '')}" if member_data.get('appointment_date') else "",
         "appointment_location": member_data.get("nearest_hospital", "Location not found")
     }
+    patient_lang = member_data.get("primary_language", "English").strip().lower()
+    if patient_lang == "spanish":
+        template_file = "care_gap_reminder_es.html"
+    elif patient_lang == "german":
+        template_file = "care_gap_reminder_de.html"
+    elif patient_lang == "french":
+        template_file = "care_gap_reminder_fr.html"
+    elif patient_lang == "arabic":
+        template_file = "care_gap_reminder_ar.html"
+    elif patient_lang == "chinese":
+        template_file = "care_gap_reminder_zh.html"
+    else:
+        template_file = "care_gap_reminder.html"
     
-    email_content = render_template("care_gap_reminder.html", context_data)
-    
+    email_content = render_template(template_file, context_data)
     return {"content": email_content, "language": member_data.get("primary_language", "English")}
 
 @router.post("/send-email")

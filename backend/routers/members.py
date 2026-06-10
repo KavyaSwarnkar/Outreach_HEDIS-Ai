@@ -16,6 +16,7 @@ def get_members(
     follow_up: Optional[str] = None,
     housing: Optional[str] = None,
     transportation: Optional[str] = None,
+    risk_level: Optional[str] = None,
     page: int = 1,
     limit: int = 50
 ):
@@ -47,6 +48,12 @@ def get_members(
     if transportation:
         query += " AND transportation_access = ?"
         params.append(transportation)
+    if risk_level == "HIGH":
+        query += " AND screening_risk_score >= 0.70"
+    if risk_level == "MODERATE":
+        query += " AND screening_risk_score >= 0.40 AND screening_risk_score < 0.70"
+    if risk_level == "LOW":
+        query += " AND screening_risk_score IS NOT NULL AND screening_risk_score < 0.40"
         
     # Count total (cast to native Python int to avoid numpy int64 serialization errors)
     count_query = f"SELECT COUNT(*) FROM ({query})"
@@ -54,7 +61,10 @@ def get_members(
     
     # Pagination
     offset = (page - 1) * limit
-    query += " ORDER BY id_normalized ASC LIMIT ? OFFSET ?"
+    if risk_level:
+        query += " ORDER BY screening_risk_score DESC NULLS LAST, id_normalized ASC LIMIT ? OFFSET ?"
+    else:
+        query += " ORDER BY id_normalized ASC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     
     df = conn.execute(query, params).df()

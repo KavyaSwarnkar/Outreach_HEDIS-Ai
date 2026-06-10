@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchKPIs, fetchCharts, fetchMembers, fetchOutreachLog } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 // --- CHANGED: Added Activity, TrendingUp, and CheckCircle2 to imports ---
-import { Users, AlertCircle, PhoneMissed, Mail, Download, Eye, Activity, TrendingUp, CheckCircle2 } from "lucide-react";
+import { Users, AlertCircle, PhoneMissed, Mail, Download, Eye, Activity, TrendingUp, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,6 +13,19 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+
+function formatDateOnly(value?: string | null) {
+  if (!value) return "N/A";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.split("T")[0] || "N/A";
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export default function Dashboard() {
   const [kpis, setKpis] = useState<any>(null);
@@ -64,6 +77,9 @@ export default function Dashboard() {
   if (loading) return <div className="p-8 text-center text-slate-500">Loading dashboard...</div>;
 
   const COLORS = ['#2563EB', '#10B981', '#F97316', '#8B5CF6'];
+  const overdueSummary = charts?.overdue_summary || {};
+  const overdueBuckets = charts?.overdue_buckets || [];
+  const topOverduePatients = charts?.top_overdue_patients || [];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -78,7 +94,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="text-3xl font-extrabold text-slate-900">{kpis?.priority_alerts?.length || 0}</div>
             <p className="text-xs text-slate-600 mt-1 font-medium leading-tight">
-              Gaps open, no follow-up,<br/>no transport.
+              Open gaps with high risk,<br/>overdue, or barriers.
             </p>
           </CardContent>
         </Card>
@@ -240,6 +256,88 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="shadow-sm border-slate-200 overflow-hidden mb-6">
+          <CardHeader className="bg-slate-100 border-b border-slate-200">
+            <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-red-600" />
+              Overdue Patients Insight
+            </CardTitle>
+            <p className="text-sm text-slate-500">Open care gaps grouped by overdue age from Excel screening data</p>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                <p className="text-sm font-medium text-red-600">Total Overdue Patients</p>
+                <p className="text-2xl font-bold text-red-900">{overdueSummary.total_overdue || 0}</p>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-lg border border-amber-100">
+                <p className="text-sm font-medium text-amber-600">Average Days Overdue</p>
+                <p className="text-2xl font-bold text-amber-900">{overdueSummary.average_days_overdue || 0}</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <p className="text-sm font-medium text-slate-600">Highest Days Overdue</p>
+                <p className="text-2xl font-bold text-slate-900">{overdueSummary.max_days_overdue || 0}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+              <div className="h-80 w-full">
+                <h3 className="text-sm font-semibold text-slate-500 mb-4 uppercase tracking-wider">Overdue Patient Buckets</h3>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={overdueBuckets}>
+                    <XAxis dataKey="bucket" axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: '#f8fafc' }} />
+                    <Bar dataKey="patient_count" name="Patients" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="w-full overflow-x-auto border rounded-lg border-slate-200">
+                <table className="w-full text-sm text-left text-slate-600">
+                  <thead className="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Patient</th>
+                      <th className="px-4 py-3 font-semibold">Measure</th>
+                      <th className="px-4 py-3 font-semibold text-right">Days</th>
+                      <th className="px-4 py-3 font-semibold">Due Date</th>
+                      <th className="px-4 py-3 font-semibold text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topOverduePatients.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500">No overdue patient records found.</td>
+                      </tr>
+                    ) : (
+                      topOverduePatients.map((patient: any) => (
+                        <tr key={`${patient.id_normalized}-${patient.measure}`} className="bg-white border-b hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-slate-900">{patient.member_name}</div>
+                            <div className="text-xs text-slate-500">{patient.profile_member_id}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline" className="bg-white">{patient.measure}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-red-600">{patient.days_overdue}</td>
+                          <td className="px-4 py-3">{formatDateOnly(patient.gap_due_date)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <Link href={patient.measure === 'BCS' ? `/members/${patient.id_normalized}/details` : `/members/${patient.id_normalized}`}>
+                              <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 font-medium">
+                                <Eye className="w-4 h-4 mr-2" /> View
+                              </Button>
+                            </Link>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* --- CHANGED: NEW OUTREACH EFFECTIVENESS WITH TABLE & SUMMARY --- */}
         <Card className="shadow-sm border-slate-200 overflow-hidden mt-8">

@@ -24,7 +24,7 @@ def init_db():
                 p_cols = list(df.columns)
                 
             conn.register(f'df_{table_name}', df)
-            conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_{table_name}")
+            conn.execute(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df_{table_name}")
 
     b_cols = []
     # 2. Load the secondary BCS dataset
@@ -38,7 +38,7 @@ def init_db():
             
             bcs_table = "bcs_input_data_sample"
             conn.register(f'df_{bcs_table}', df_bcs)
-            conn.execute(f"CREATE TABLE IF NOT EXISTS {bcs_table} AS SELECT * FROM df_{bcs_table}")
+            conn.execute(f"CREATE OR REPLACE TABLE {bcs_table} AS SELECT * FROM df_{bcs_table}")
 
     # Helper function to safely extract columns
     def safe_col(col_name, cols_list, prefix):
@@ -49,6 +49,9 @@ def init_db():
     email_expr = "COALESCE(p.email, b.email)" if "email" in b_cols else "p.email"
     gender_expr = "COALESCE(p.gender, b.gender)" if "gender" in b_cols else "p.gender"
     address_expr = "COALESCE(p.address, b.address)" if "address" in b_cols else "p.address"
+    nearest_hospital_in_p = safe_col("nearest_hospital", p_cols, "p")
+    nearest_hospital_in_b = safe_col("nearest_hospital", b_cols, "b")
+    nearest_hospital_expr = f"COALESCE({nearest_hospital_in_p}, {nearest_hospital_in_b})"
 
     # PCP & Visit mapping (checking both files)
     pcp_in_p = safe_col("provider_name", p_cols, "p")
@@ -65,7 +68,19 @@ def init_db():
     phone_expr = safe_col("phone_number", b_cols, "b")
     lob_expr = safe_col("line_of_business", b_cols, "b")
     age_expr = safe_col("age", b_cols, "b")
-    risk_expr = safe_col("risk_score", b_cols, "b")
+    risk_in_p = safe_col("risk_score", p_cols, "p")
+    risk_in_b = safe_col("risk_score", b_cols, "b")
+    risk_expr = f"COALESCE({risk_in_b}, {risk_in_p})"
+    income_in_b = safe_col("income", b_cols, "b")
+    transportation_access_in_b = safe_col("transportation_access", b_cols, "b")
+    mobility_status_in_b = safe_col("mobility_status", b_cols, "b")
+    housing_status_in_b = safe_col("housing_status", b_cols, "b")
+    provider_access_in_b = safe_col("provider_access", b_cols, "b")
+    income_expr = f"COALESCE(s.income, {income_in_b})"
+    transportation_access_expr = f"COALESCE(s.transportation_access, {transportation_access_in_b})"
+    mobility_status_expr = f"COALESCE(s.mobility_status, {mobility_status_in_b})"
+    housing_status_expr = f"COALESCE(s.housing_status, {housing_status_in_b})"
+    provider_access_expr = f"COALESCE(s.provider_access, {provider_access_in_b})"
     days_overdue_expr = safe_col("days_overdue", b_cols, "b")
     notes_expr = safe_col("notes", b_cols, "b")
     gap_det_expr = safe_col("gap_detected_date", b_cols, "b")
@@ -105,7 +120,7 @@ def init_db():
         {address_expr} as address,
         {gender_expr} as gender,
         p.next_plan_of_action,
-        p.nearest_hospital,
+        {nearest_hospital_expr} as nearest_hospital,
         COALESCE(q.member_id, b.member_id) as qi_member_id,
         COALESCE(q.measure, CASE WHEN b.member_id IS NOT NULL THEN 'BCS' ELSE NULL END) as measure,
         COALESCE(q.complaint_condition, CASE WHEN {gap_status_expr} = 'Closed' THEN 'YES' ELSE 'NO' END) as compliant,
@@ -113,12 +128,12 @@ def init_db():
         COALESCE(m.complaint_condition, 'Breast Cancer Screening') as measure_description,
         m.data_elements,
         m.gap_closure,
-        s.income,
-        s.transportation_access,
+        {income_expr} as income,
+        {transportation_access_expr} as transportation_access,
         COALESCE(s.primary_language, {preferred_lang_expr}) as primary_language,
-        s.mobility_status,
-        s.housing_status,
-        s.provider_access,
+        {mobility_status_expr} as mobility_status,
+        {housing_status_expr} as housing_status,
+        {provider_access_expr} as provider_access,
         
         {pcp_expr} as pcp_assigned,
         {upcoming_pcp_expr} as upcoming_pcp_visit_date,
@@ -150,10 +165,42 @@ def init_db():
           FROM medical_claim c 
           WHERE CAST(SUBSTRING(c.member_id, 2) AS INT) = CAST(SUBSTRING(all_m.member_id, 2) AS INT)) as last_claim_date,
           
-        CASE 
-            WHEN COALESCE(q.complaint_condition, CASE WHEN {gap_status_expr} = 'Closed' THEN 'YES' ELSE 'NO' END) = 'NO' AND COALESCE(q.follow_up, 'N') = 'N' THEN 'CRITICAL'
-            WHEN COALESCE(q.complaint_condition, CASE WHEN {gap_status_expr} = 'Closed' THEN 'YES' ELSE 'NO' END) = 'NO' AND COALESCE(q.follow_up, 'N') = 'Y' THEN 'HIGH'
-            WHEN COALESCE(q.complaint_condition, CASE WHEN {gap_status_expr} = 'Closed' THEN 'YES' ELSE 'NO' END) = 'YES' THEN 'MEDIUM'
+        CASE
+            WHEN COALESCE(q.complaint_condition, CASE WHEN {gap_status_expr} = 'Closed' THEN 'YES' ELSE 'NO' END) = 'NO'
+                 AND (
+                    COALESCE({risk_expr}, 0) >= 0.70
+                    OR COALESCE({days_overdue_expr}, 0) >= 365
+                    OR (
+                        COALESCE({risk_expr}, 0) >= 0.55
+                        AND (
+                            COALESCE({days_overdue_expr}, 0) >= 180
+                            OR {transportation_access_expr} = 'N'
+                            OR {housing_status_expr} = 'N'
+                            OR COALESCE({transport_barrier_expr}, 'N') = 'Y'
+                        )
+                    )
+                    OR (
+                        ({transportation_access_expr} = 'N' OR COALESCE({transport_barrier_expr}, 'N') = 'Y')
+                        AND ({housing_status_expr} = 'N' OR COALESCE({financial_barrier_expr}, 'N') = 'Y')
+                    )
+                 )
+                THEN 'CRITICAL'
+            WHEN COALESCE(q.complaint_condition, CASE WHEN {gap_status_expr} = 'Closed' THEN 'YES' ELSE 'NO' END) = 'NO'
+                 AND (
+                    COALESCE({risk_expr}, 0) >= 0.40
+                    OR COALESCE({days_overdue_expr}, 0) BETWEEN 31 AND 179
+                    OR COALESCE({financial_barrier_expr}, 'N') = 'Y'
+                    OR COALESCE({literacy_barrier_expr}, 'N') = 'Y'
+                 )
+                THEN 'HIGH'
+            WHEN COALESCE(q.complaint_condition, CASE WHEN {gap_status_expr} = 'Closed' THEN 'YES' ELSE 'NO' END) = 'NO'
+                THEN 'MEDIUM'
+            WHEN COALESCE({risk_expr}, 0) >= 0.45
+                 OR (
+                    ({transportation_access_expr} = 'N' OR COALESCE({transport_barrier_expr}, 'N') = 'Y')
+                    AND ({housing_status_expr} = 'N' OR COALESCE({financial_barrier_expr}, 'N') = 'Y' OR COALESCE({literacy_barrier_expr}, 'N') = 'Y')
+                 )
+                THEN 'MEDIUM'
             ELSE 'LOW'
         END as priority
         

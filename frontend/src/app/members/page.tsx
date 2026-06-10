@@ -22,6 +22,20 @@ function MembersList() {
   const [filterMeasure, setFilterMeasure] = useState("ALL");
   const [filterGap, setFilterGap] = useState("ALL");
   const [filterSdoh, setFilterSdoh] = useState("ALL");
+  const [pageSize, setPageSize] = useState("120");
+  const [totalMembers, setTotalMembers] = useState(0);
+
+  const formatRiskScore = (score?: number | null) => {
+    if (score === null || score === undefined) return "N/A";
+    return `${Math.round(score * 100)}%`;
+  };
+
+  const getRiskBadgeClass = (score?: number | null) => {
+    if (score === null || score === undefined) return "bg-slate-100 text-slate-600 border-slate-200";
+    if (score >= 0.7) return "bg-red-100 text-red-700 border-red-200";
+    if (score >= 0.4) return "bg-amber-100 text-amber-700 border-amber-200";
+    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  };
 
   useEffect(() => {
     setSearchInput(searchQuery);
@@ -29,7 +43,7 @@ function MembersList() {
 
   const loadMembers = () => {
     setLoading(true);
-    let params: any = {};
+    let params: any = { limit: pageSize };
     if (filterMeasure !== "ALL") params.measure = filterMeasure;
     if (filterGap !== "ALL") params.compliant = filterGap;
     if (searchQuery) params.search = searchQuery;
@@ -42,13 +56,14 @@ function MembersList() {
     
     fetchMembers(params).then((data) => {
       setMembers(data.data);
+      setTotalMembers(data.total || 0);
       setLoading(false);
     });
   };
 
   useEffect(() => {
     loadMembers();
-  }, [filterMeasure, filterGap, filterSdoh, searchQuery]);
+  }, [filterMeasure, filterGap, filterSdoh, searchQuery, pageSize]);
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -71,6 +86,7 @@ function MembersList() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Members Directory</h1>
+          {!searchQuery && <p className="text-sm text-slate-500 mt-1">Showing {members.length} of {totalMembers} patient records</p>}
           {searchQuery && <p className="text-sm text-slate-600 mt-1">Showing results for: <span className="font-medium text-slate-900">"{searchQuery}"</span></p>}
         </div>
         <div className="flex flex-nowrap items-center gap-3">
@@ -134,6 +150,20 @@ function MembersList() {
               <SelectItem value="LANG_NOT_EN">Non-English Speaker</SelectItem>
             </SelectContent>
           </Select>
+
+          <Select value={pageSize} onValueChange={(val) => setPageSize(val!)}>
+            <SelectTrigger className="w-[130px] text-xs bg-white shadow-sm border-slate-200 h-8 text-slate-700">
+              <SelectValue placeholder="Records per page">
+                {pageSize} records
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30">30 records per page</SelectItem>
+              <SelectItem value="60">60 records per page</SelectItem>
+              <SelectItem value="90">90 records per page</SelectItem>
+              <SelectItem value="120">All patient records</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -144,6 +174,7 @@ function MembersList() {
               <TableHead className="font-semibold text-slate-700 h-12">Member ID</TableHead>
               <TableHead className="font-semibold text-slate-700 h-12">Name</TableHead>
               <TableHead className="font-semibold text-slate-700 h-12">Measure</TableHead>
+              <TableHead className="font-semibold text-slate-700 h-12">Risk Score</TableHead>
               <TableHead className="font-semibold text-slate-700 h-12">Gap Status</TableHead>
               <TableHead className="font-semibold text-slate-700 h-12">Follow-Up</TableHead>
               <TableHead className="font-semibold text-slate-700 h-12">SDOH Profile</TableHead>
@@ -152,14 +183,19 @@ function MembersList() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-12 text-slate-500 font-medium">Loading directory...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-12 text-slate-500 font-medium">Loading directory...</TableCell></TableRow>
             ) : members.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-12 text-slate-500">No members found matching your criteria.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-12 text-slate-500">No members found matching your criteria.</TableCell></TableRow>
             ) : members.map((m: any, idx: number) => (
               <TableRow key={`${m.id_normalized}-${m.measure}-${idx}`} className={getRowColor(m.compliant, m.follow_up)}>
                 <TableCell className="font-semibold text-slate-900">{m.profile_member_id}</TableCell>
                 <TableCell className="font-medium text-slate-700">{m.member_name}</TableCell>
                 <TableCell><Badge variant="outline" className="bg-white">{m.measure}</Badge></TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={getRiskBadgeClass(m.screening_risk_score)}>
+                    {formatRiskScore(m.screening_risk_score)}
+                  </Badge>
+                </TableCell>
                 <TableCell>
                   {m.compliant === "NO" ? (
                     <Badge variant="secondary" className="bg-red-100 text-red-700 hover:bg-red-200 border-none font-medium shadow-sm">Gap Open</Badge>

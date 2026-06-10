@@ -24,22 +24,62 @@ export default function Outreach() {
   const [filterGap, setFilterGap] = useState("ALL");
   const [filterFollowup, setFilterFollowup] = useState("ALL");
   const [filterMeasure, setFilterMeasure] = useState("ALL");
+  const [filterRisk, setFilterRisk] = useState("ALL");
+
+  const formatRiskScore = (score?: number | null) => {
+    if (score === null || score === undefined) return "N/A";
+    return `${Math.round(score * 100)}%`;
+  };
+
+  const getRiskTier = (score?: number | null) => {
+    if (score === null || score === undefined) return "Not Scored";
+    if (score >= 0.7) return "High Risk";
+    if (score >= 0.4) return "Moderate Risk";
+    return "Low Risk";
+  };
+
+  const getRiskBadgeClass = (score?: number | null) => {
+    if (score === null || score === undefined) return "bg-slate-100 text-slate-600 border-slate-200";
+    if (score >= 0.7) return "bg-red-100 text-red-700 border-red-200";
+    if (score >= 0.4) return "bg-amber-100 text-amber-700 border-amber-200";
+    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  };
+
+  const getPriorityBadgeClass = (priority?: string) => {
+    if (priority === "CRITICAL") return "bg-red-600 text-white border-red-700 shadow-sm ring-2 ring-red-100 font-extrabold tracking-wide";
+    if (priority === "HIGH") return "bg-orange-100 text-orange-700 border-orange-200 font-semibold";
+    if (priority === "MEDIUM") return "bg-amber-50 text-amber-700 border-amber-200 font-semibold";
+    return "bg-slate-100 text-slate-600 border-slate-200 font-semibold";
+  };
+
+  const matchesRiskFilter = (score?: number | null) => {
+    if (filterRisk === "ALL") return true;
+    if (score === null || score === undefined) return false;
+    if (filterRisk === "HIGH") return score >= 0.7;
+    if (filterRisk === "MODERATE") return score >= 0.4 && score < 0.7;
+    if (filterRisk === "LOW") return score < 0.4;
+    return true;
+  };
 
   const loadData = () => {
-    let params: any = {};
+    let params: any = { limit: 120 };
     if (filterGap !== 'ALL') params.compliant = filterGap;
     if (filterFollowup !== 'ALL') params.follow_up = filterFollowup;
     if (filterMeasure !== 'ALL') params.measure = filterMeasure;
     
     fetchMembers(params)
-      .then(res => setMembers(res.data));
+      .then(res => {
+        const filtered = (res.data || []).filter((member: any) => matchesRiskFilter(member.screening_risk_score));
+        setMembers(filtered);
+        setSelected(new Set());
+      });
     fetchOutreachLog().then(res => setLogs(res));
     fetchOutreachAnalytics().then(res => setAnalytics(res)).catch(() => setAnalytics(null));
   };
 
   useEffect(() => {
     loadData();
-  }, [filterGap, filterFollowup, filterMeasure]);
+  }, [filterGap, filterFollowup, filterMeasure, filterRisk]);
 
   const toggleAll = () => {
     if (selected.size === members.length) {
@@ -166,6 +206,7 @@ export default function Outreach() {
                     <SelectItem value="OMW">OMW</SelectItem>
                     <SelectItem value="SPC">SPC</SelectItem>
                     <SelectItem value="COL">COL</SelectItem>
+                    <SelectItem value="BCS">BCS</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -194,6 +235,23 @@ export default function Outreach() {
                     <SelectItem value="Y">Done</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Select value={filterRisk} onValueChange={(val) => setFilterRisk(val!)}>
+                  <SelectTrigger className="w-[150px] h-8 text-xs bg-white">
+                    <SelectValue placeholder="Risk Score">
+                      {filterRisk === 'ALL' ? 'All Risk Scores' :
+                       filterRisk === 'HIGH' ? 'High Risk' :
+                       filterRisk === 'MODERATE' ? 'Moderate Risk' :
+                       'Low Risk'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Risk Scores</SelectItem>
+                    <SelectItem value="HIGH">High Risk (70%+)</SelectItem>
+                    <SelectItem value="MODERATE">Moderate Risk (40-69%)</SelectItem>
+                    <SelectItem value="LOW">Low Risk (&lt;40%)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardHeader>
@@ -205,6 +263,7 @@ export default function Outreach() {
                     <TableHead className="w-[50px]"><Checkbox checked={selected.size === members.length && members.length > 0} onCheckedChange={toggleAll} /></TableHead>
                     <TableHead>Member</TableHead>
                     <TableHead>Measure</TableHead>
+                    <TableHead>Risk Score</TableHead>
                     <TableHead>Priority</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -218,13 +277,18 @@ export default function Outreach() {
                       </TableCell>
                       <TableCell>{m.measure}</TableCell>
                       <TableCell>
-                        <Badge variant={m.priority === 'CRITICAL' ? 'destructive' : m.priority === 'HIGH' ? 'default' : 'secondary'} className="text-[10px]">
+                        <Badge variant="outline" className={`text-[10px] ${getRiskBadgeClass(m.screening_risk_score)}`}>
+                          {formatRiskScore(m.screening_risk_score)} · {getRiskTier(m.screening_risk_score)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`text-[10px] px-2.5 py-1 ${getPriorityBadgeClass(m.priority)}`}>
                           {m.priority}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
-                  {members.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-8 text-slate-500">No members match filters.</TableCell></TableRow>}
+                  {members.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-slate-500">No members match filters.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
@@ -257,7 +321,7 @@ export default function Outreach() {
                   {/* --- CHANGED: Hide Raw HTML code in the list view --- */}
                   <div className="text-sm text-slate-700 line-clamp-2 bg-slate-50 border border-slate-100 p-2 rounded italic">
                     {log.content?.includes('<html') || log.content?.includes('<div') 
-                      ? "📝 [ HTML Email Template - Click to Preview ]" 
+                      ? "Click to preview full outreach email" 
                       : `"${log.content}"`}
                   </div>
 
