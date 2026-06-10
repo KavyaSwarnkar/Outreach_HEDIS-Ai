@@ -247,9 +247,9 @@ export default function Outreach() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All Risk Scores</SelectItem>
-                    <SelectItem value="HIGH">High Risk (70%+)</SelectItem>
-                    <SelectItem value="MODERATE">Moderate Risk (40-69%)</SelectItem>
-                    <SelectItem value="LOW">Low Risk (&lt;40%)</SelectItem>
+                    <SelectItem value="HIGH">High Risk</SelectItem>
+                    <SelectItem value="MODERATE">Moderate Risk</SelectItem>
+                    <SelectItem value="LOW">Low Risk</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -6,6 +6,29 @@ import os
 import re
 from datetime import datetime, timedelta
 
+def parse_date(value):
+    if value is None:
+        return None
+    if hasattr(value, "to_pydatetime"):
+        return value.to_pydatetime()
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("T", " ").split(".")[0])
+    except ValueError:
+        return None
+
+def format_date(value):
+    parsed = parse_date(value)
+    return parsed.strftime("%B %d, %Y") if parsed else "Date to be confirmed"
+
+def days_until(value):
+    parsed = parse_date(value)
+    if not parsed:
+        return "TBD"
+    delta_days = (parsed.date() - datetime.now().date()).days
+    return str(max(delta_days, 0))
+
 def summarize(text: str, fallback: str = "(no preview)"):
     if not text:
         return fallback
@@ -25,6 +48,26 @@ def render_template(template_name: str, context: dict) -> str:
         html = html.replace(f"{{{{ {key} }}}}", str(value))
     return html
 
+def get_email_schedule_context(member_data: dict, measure_code: str):
+    if measure_code == 'COL':
+        remaining_days = "10"
+        due_date = (datetime.now() + timedelta(days=10)).strftime("%B %d, %Y")
+    elif measure_code == 'OMW':
+        remaining_days = "3"
+        due_date = (datetime.now() + timedelta(days=3)).strftime("%B %d, %Y")
+    elif measure_code == 'SPC':
+        remaining_days = "25"
+        due_date = (datetime.now() + timedelta(days=25)).strftime("%B %d, %Y")
+    elif measure_code == 'BCS':
+        pcp_visit_date = member_data.get("upcoming_pcp_visit_date")
+        remaining_days = days_until(pcp_visit_date)
+        due_date = format_date(pcp_visit_date)
+    else:
+        remaining_days = "TBD"
+        due_date = (datetime.now() + timedelta(days=14)).strftime("%B %d, %Y")
+
+    return remaining_days, due_date
+
 @router.post("/send-member-reminder/{id_normalized}")
 def send_member_reminder(id_normalized: int):
     conn = get_db()
@@ -35,16 +78,21 @@ def send_member_reminder(id_normalized: int):
         
     member_data = member.to_dict(orient="records")[0]
     
-    # Determine remaining_days (lower bound of the expected range) based on measure code
     measure_code = (member_data.get("measure") or "").upper()
-    if measure_code == 'COL':
+    if measure_code == 'BCS':
+        remaining_days, due_date = get_email_schedule_context(member_data, measure_code)
+    elif measure_code == 'COL':
         remaining_days = "10-15"
+        due_date = ""
     elif measure_code == 'OMW':
         remaining_days = "3-5"
+        due_date = ""
     elif measure_code == 'SPC':
         remaining_days = "25-30"
+        due_date = ""
     else:
         remaining_days = "TBD"
+        due_date = ""
 
     context_data = {
         "member_name": member_data.get("member_name", "Valued Member"),
@@ -52,10 +100,11 @@ def send_member_reminder(id_normalized: int):
         "measure_code": member_data.get("measure", "HEDIS-GAP"),
         "gap_closure_action": member_data.get("gap_closure", "Consult with your Primary Care Provider."),
         "remaining_days": remaining_days,
+        "due_date": due_date,
         "care_gaps": member_data.get("care_gaps", "1"),
         "upcoming_appointment": member_data.get("appointment_date") is not None,
         "appointment_datetime": f"{member_data.get('appointment_date', '')} at {member_data.get('appointment_time', '')}" if member_data.get('appointment_date') else "",
-        "appointment_location": member_data.get("appointment_location", "")
+        "appointment_location": member_data.get("nearest_hospital") or member_data.get("appointment_location", "")
     }
     
     # Render string structure 
@@ -82,34 +131,16 @@ def generate_email(req: EmailGenerateRequest):
     result = result.where(result.notnull(), None)
     member_data = result.to_dict(orient="records")[0]
     
-    # Compute remaining_days and actual due date based on measure code
     measure_code = (member_data.get("measure") or "").upper()
-    if measure_code == 'COL':
-        remaining_days = "10"
-        days_to_add = 10
-    elif measure_code == 'OMW':
-        remaining_days = "3"
-        days_to_add = 3
-    elif measure_code == 'SPC':
-        remaining_days = "25"
-        days_to_add = 25
-    else:
-        remaining_days = "TBD"
-        days_to_add = 14 # default fallback
-        
-    # Calculate the target due date
-    calculated_due_date = (datetime.now() + timedelta(days=days_to_add)).strftime("%B %d, %Y")
-    if measure_code == "BCS":
-        appointment_date = member_data.get("upcoming_pcp_visit_date")
-    else:
-        appointment_date = calculated_due_date
+    remaining_days, due_date = get_email_schedule_context(member_data, measure_code)
+
     context_data = {
         "member_name": member_data.get("member_name", "Valued Member"),
         "measure_description": member_data.get("measure_description", "Preventive Health Visit"),
         "measure_code": member_data.get("measure", "HEDIS-GAP"),
         "gap_closure_action": member_data.get("gap_closure", "Consult with your Primary Care Provider."),
         "remaining_days": remaining_days,
-        "due_date": appointment_date,
+        "due_date": due_date,
         "care_gaps": member_data.get("care_gaps", "1"),
         "upcoming_appointment": member_data.get("appointment_date") is not None,
         
@@ -242,6 +273,8 @@ def bulk_outreach(req: BulkOutreachRequest):
         if res.empty:
             continue
         member_data = res.to_dict(orient="records")[0]
+        measure_code = (member_data.get("measure") or "").upper()
+        remaining_days, due_date = get_email_schedule_context(member_data, measure_code)
         
         # Render template instead of generating AI content
         context_data = {
@@ -249,12 +282,12 @@ def bulk_outreach(req: BulkOutreachRequest):
             "measure_description": member_data.get("measure_description", "Preventive Health Visit"),
             "measure_code": member_data.get("measure", "HEDIS-GAP"),
             "gap_closure_action": member_data.get("gap_closure", "Consult with your Primary Care Provider."),
-            # Compute remaining_days (lower bound) based on measure code
-            "remaining_days": (lambda m: "10" if (m or "").upper() == 'COL' else ("5" if (m or "").upper() == 'OMW' else ("25" if (m or "").upper() == 'SPC' else "TBD")))(member_data.get("measure")),
+            "remaining_days": remaining_days,
+            "due_date": due_date,
             "care_gaps": member_data.get("care_gaps", "1"),
             "upcoming_appointment": member_data.get("appointment_date") is not None,
             "appointment_datetime": f"{member_data.get('appointment_date', '')} at {member_data.get('appointment_time', '')}" if member_data.get('appointment_date') else "",
-            "appointment_location": member_data.get("appointment_location", "")
+            "appointment_location": member_data.get("nearest_hospital") or member_data.get("appointment_location", "")
         }
         
         email_content = render_template("care_gap_reminder.html", context_data)

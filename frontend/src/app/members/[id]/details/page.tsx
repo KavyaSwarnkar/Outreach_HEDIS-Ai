@@ -150,7 +150,7 @@ export default function MemberExtendedDetails() {
           </CardHeader>
           <CardContent className="pt-4 space-y-3 text-sm">
             <div className="flex justify-between"><span className="text-slate-500">Calculated Risk Score:</span><span className="font-bold text-slate-900">{member.screening_risk_score ? `${(member.screening_risk_score * 100).toFixed(1)}%` : 'N/A'}</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">Family History of Breast Ca:</span><span className="font-medium">{member.family_history_breast_cancer === 'Y' ? 'Yes (Present)' : 'No'}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Family History of Breast Cancer:</span><span className="font-medium">{member.family_history_breast_cancer === 'Y' ? 'Yes (Present)' : 'No'}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Comorbidity Index Counter:</span><span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded-full font-semibold">{member.comorbidity_count || 0}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Provider Alerts Engaged:</span><Badge variant={member.provider_alert === 'Y' ? 'default' : 'outline'}>{member.provider_alert === 'Y' ? 'Active Alert' : 'No Alert'}</Badge></div>
           </CardContent>
